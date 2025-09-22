@@ -74,6 +74,17 @@ class TodoRepository:
         logger.info(f"Deleted todo item with ID: {todo_id}")
         
         return True
+    
+    def create_many(self, todo_creates: List[TodoCreate]) -> List[Todo]:
+        """Create multiple Todo items at once."""
+        created_todos = []
+        
+        for todo_create in todo_creates:
+            todo = self.create(todo_create)
+            created_todos.append(todo)
+        
+        logger.info(f"Created {len(created_todos)} todo items")
+        return created_todos
 
 # Create a single instance to be used throughout the app
 todo_repository = TodoRepository()
