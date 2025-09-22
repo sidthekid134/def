@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException, Depends, status
 from typing import Dict, Any
 import uvicorn
 import logging
+from app.routes import router as todo_router
 
 # Configure logging
 logging.basicConfig(
@@ -16,6 +17,9 @@ app = FastAPI(
     description="A simple Todo API built with FastAPI",
     version="0.1.0",
 )
+
+# Include routers
+app.include_router(todo_router)
 
 # Health check endpoint
 @app.get("/health", status_code=status.HTTP_200_OK, tags=["health"])
@@ -37,4 +41,4 @@ async def root() -> Dict[str, str]:
     return {"message": "Welcome to the Todo API"}
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
