@@ -122,3 +122,19 @@ async def delete_todo(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Todo with ID {todo_id} not found"
         )
+
+@router.post("/bulk", response_model=List[Todo], status_code=status.HTTP_201_CREATED)
+async def create_todos(
+    todos: List[TodoCreate] = Body(..., description="List of todos to create")
+) -> List[Todo]:
+    """
+    Create multiple todo items in a single request.
+    
+    Args:
+        todos (List[TodoCreate]): List of todo items to create.
+        
+    Returns:
+        List[Todo]: The list of created todo items.
+    """
+    logger.info(f"Creating {len(todos)} todo items")
+    return todo_repository.create_many(todos)
