@@ -1,44 +1,61 @@
 /**
  * Task controller for handling task-related operations
+ * Implements CRUD operations for tasks using Mongoose
  */
 
-// In-memory tasks array (temporary until database is integrated)
-let tasks = [
-  {
-    id: '1',
-    title: 'Complete backend setup',
-    description: 'Set up the Node.js and Express backend',
-    status: 'in-progress',
-    dueDate: '2023-12-31',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  }
-];
+const Task = require('../models/task.model');
+const { validationResult } = require('express-validator');
 
 /**
  * Get all tasks
+ * @route GET /api/tasks
  */
-exports.getAllTasks = (req, res) => {
+exports.getAllTasks = async (req, res, next) => {
   try {
+    // Query parameters for filtering and pagination
+    const { status, page = 1, limit = 10, sortBy = 'createdAt', order = 'desc' } = req.query;
+    
+    // Build the filter query
+    const filter = { isDeleted: false };
+    if (status) {
+      filter.status = status;
+    }
+
+    // Build the sort query
+    const sortQuery = {};
+    sortQuery[sortBy] = order === 'desc' ? -1 : 1;
+
+    // Calculate skip value for pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    
+    // Execute query with pagination
+    const tasks = await Task.find(filter)
+      .sort(sortQuery)
+      .skip(skip)
+      .limit(parseInt(limit));
+      
+    // Count total documents for pagination info
+    const count = await Task.countDocuments(filter);
+    
     res.status(200).json({
       success: true,
-      count: tasks.length,
+      count,
+      totalPages: Math.ceil(count / limit),
+      currentPage: parseInt(page),
       data: tasks
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: 'Server Error'
-    });
+    next(error);
   }
 };
 
 /**
  * Get task by ID
+ * @route GET /api/tasks/:id
  */
-exports.getTaskById = (req, res) => {
+exports.getTaskById = async (req, res, next) => {
   try {
-    const task = tasks.find(t => t.id === req.params.id);
+    const task = await Task.findOne({ _id: req.params.id, isDeleted: false });
     
     if (!task) {
       return res.status(404).json({
@@ -52,115 +69,194 @@ exports.getTaskById = (req, res) => {
       data: task
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: 'Server Error'
-    });
+    // Handle invalid ID format
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid task ID format'
+      });
+    }
+    next(error);
   }
 };
 
 /**
  * Create a new task
+ * @route POST /api/tasks
  */
-exports.createTask = (req, res) => {
+exports.createTask = async (req, res, next) => {
   try {
-    const { title, description, status, dueDate } = req.body;
-    
-    // Basic validation
-    if (!title) {
+    // Check for validation errors
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
       return res.status(400).json({
         success: false,
-        error: 'Please provide a title for the task'
+        errors: errors.array()
       });
     }
     
-    // Create new task
-    const newTask = {
-      id: (tasks.length + 1).toString(),
-      title,
-      description: description || '',
-      status: status || 'pending',
-      dueDate: dueDate || null,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
+    const { title, description, status, dueDate } = req.body;
     
-    tasks.push(newTask);
+    // Create new task
+    const newTask = new Task({
+      title,
+      description,
+      status,
+      dueDate
+    });
+    
+    // Save to database
+    await newTask.save();
     
     res.status(201).json({
       success: true,
       data: newTask
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: 'Server Error'
-    });
+    // Handle Mongoose validation errors
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(val => val.message);
+      return res.status(400).json({
+        success: false,
+        errors: messages
+      });
+    }
+    next(error);
   }
 };
 
 /**
  * Update a task by ID
+ * @route PUT /api/tasks/:id
  */
-exports.updateTask = (req, res) => {
+exports.updateTask = async (req, res, next) => {
   try {
-    const { title, description, status, dueDate } = req.body;
-    const taskIndex = tasks.findIndex(t => t.id === req.params.id);
+    // Check for validation errors
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        errors: errors.array()
+      });
+    }
     
-    if (taskIndex === -1) {
+    const { title, description, status, dueDate } = req.body;
+    
+    // Find task and update it
+    const task = await Task.findOneAndUpdate(
+      { _id: req.params.id, isDeleted: false },
+      { 
+        title, 
+        description, 
+        status, 
+        dueDate 
+      },
+      { 
+        new: true,     // Return updated document
+        runValidators: true  // Run schema validators
+      }
+    );
+    
+    if (!task) {
       return res.status(404).json({
         success: false,
         error: 'Task not found'
       });
     }
     
-    // Update task
-    tasks[taskIndex] = {
-      ...tasks[taskIndex],
-      title: title || tasks[taskIndex].title,
-      description: description !== undefined ? description : tasks[taskIndex].description,
-      status: status || tasks[taskIndex].status,
-      dueDate: dueDate || tasks[taskIndex].dueDate,
-      updatedAt: new Date().toISOString()
-    };
-    
     res.status(200).json({
       success: true,
-      data: tasks[taskIndex]
+      data: task
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: 'Server Error'
-    });
+    // Handle Mongoose validation errors
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(val => val.message);
+      return res.status(400).json({
+        success: false,
+        errors: messages
+      });
+    }
+    
+    // Handle invalid ID format
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid task ID format'
+      });
+    }
+    
+    next(error);
   }
 };
 
 /**
- * Delete a task by ID
+ * Delete a task by ID (soft delete)
+ * @route DELETE /api/tasks/:id
  */
-exports.deleteTask = (req, res) => {
+exports.deleteTask = async (req, res, next) => {
   try {
-    const taskIndex = tasks.findIndex(t => t.id === req.params.id);
+    // Soft delete by setting isDeleted flag to true
+    const task = await Task.findOneAndUpdate(
+      { _id: req.params.id, isDeleted: false },
+      { isDeleted: true },
+      { new: true }
+    );
     
-    if (taskIndex === -1) {
+    if (!task) {
       return res.status(404).json({
         success: false,
         error: 'Task not found'
       });
     }
     
-    // Remove task
-    tasks.splice(taskIndex, 1);
-    
     res.status(200).json({
       success: true,
+      message: 'Task deleted successfully',
       data: {}
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: 'Server Error'
+    // Handle invalid ID format
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid task ID format'
+      });
+    }
+    
+    next(error);
+  }
+};
+
+/**
+ * Hard delete a task by ID (for admin purposes or cleanup jobs)
+ * @route DELETE /api/tasks/:id/permanent
+ */
+exports.permanentDeleteTask = async (req, res, next) => {
+  try {
+    const task = await Task.findByIdAndDelete(req.params.id);
+    
+    if (!task) {
+      return res.status(404).json({
+        success: false,
+        error: 'Task not found'
+      });
+    }
+    
+    res.status(200).json({
+      success: true,
+      message: 'Task permanently deleted',
+      data: {}
     });
+  } catch (error) {
+    // Handle invalid ID format
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid task ID format'
+      });
+    }
+    
+    next(error);
   }
 };

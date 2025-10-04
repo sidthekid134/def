@@ -8,10 +8,14 @@ dotenv.config();
 
 // Import configuration
 const config = require('./src/config/config');
+const connectDB = require('./src/config/database');
 
 // Initialize Express app
 const app = express();
 const PORT = config.port;
+
+// Connect to MongoDB
+connectDB();
 
 // Middleware
 app.use(cors(config.corsOptions));
