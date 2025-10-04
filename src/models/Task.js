@@ -1,11 +1,10 @@
-// This is a placeholder for a future database model
-// In the next stories, this will be replaced with an actual database model
+const mongoose = require('mongoose');
+const config = require('../config/config');
 
 /**
- * Task Model
+ * Task Schema
  * 
  * Properties:
- * - id: unique identifier for the task
  * - title: title of the task (required)
  * - description: detailed description of the task (optional)
  * - status: current status of the task (pending, in-progress, completed)
@@ -13,20 +12,48 @@
  * - createdAt: date when the task was created
  * - updatedAt: date when the task was last updated
  */
-
-class Task {
-  constructor(data) {
-    this.id = data.id;
-    this.title = data.title;
-    this.description = data.description || '';
-    this.status = data.status || 'pending';
-    this.dueDate = data.dueDate;
-    this.createdAt = data.createdAt || new Date().toISOString();
-    this.updatedAt = data.updatedAt || new Date().toISOString();
+const TaskSchema = new mongoose.Schema({
+  title: {
+    type: String,
+    required: [true, 'Task title is required'],
+    trim: true,
+    maxlength: [100, 'Task title cannot be more than 100 characters']
+  },
+  description: {
+    type: String,
+    trim: true,
+    default: '',
+    maxlength: [500, 'Task description cannot be more than 500 characters']
+  },
+  status: {
+    type: String,
+    enum: {
+      values: config.taskStatuses,
+      message: 'Status must be one of: ' + config.taskStatuses.join(', ')
+    },
+    default: config.defaultTaskStatus
+  },
+  dueDate: {
+    type: Date,
+    validate: {
+      validator: function(value) {
+        // Due date can be null or must be in the future
+        return value === null || value > new Date();
+      },
+      message: 'Due date must be in the future'
+    }
   }
+}, {
+  timestamps: true // Automatically adds createdAt and updatedAt fields
+});
 
-  // This class will be expanded with validation and database methods
-  // in future implementations
-}
+// Add any pre/post hooks here if needed
+
+// Create static methods for common operations
+TaskSchema.statics.findByStatus = function(status) {
+  return this.find({ status });
+};
+
+const Task = mongoose.model('Task', TaskSchema);
 
 module.exports = Task;
