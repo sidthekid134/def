@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
 const dotenv = require('dotenv');
+const { notFound, errorHandler } = require('./src/middlewares/error.middleware');
 
 // Load environment variables
 dotenv.config();
@@ -26,22 +27,11 @@ app.get('/health', (req, res) => {
   res.status(200).json({ status: 'UP', message: 'Server is running' });
 });
 
-// Global error handler
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(err.statusCode || 500).json({
-    success: false,
-    message: err.message || 'Internal Server Error',
-  });
-});
-
 // Handle 404 routes
-app.use((req, res) => {
-  res.status(404).json({
-    success: false,
-    message: `Route not found: ${req.originalUrl}`,
-  });
-});
+app.use(notFound);
+
+// Global error handler
+app.use(errorHandler);
 
 // Set port
 const PORT = process.env.PORT || 3000;
