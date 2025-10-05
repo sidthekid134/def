@@ -1,0 +1,26 @@
+{
+  "name": "recipe-content-fetcher",
+  "version": "1.0.0",
+  "description": "Recipe content fetching and extraction library",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "node-fetch": "^2.6.7",
+    "cheerio": "^1.0.0-rc.12",
+    "jsdom": "^19.0.0",
+    "typescript": "^4.7.4",
+    "lru-cache": "^7.14.1"
+  },
+  "devDependencies": {
+    "@types/node": "^18.11.9",
+    "@types/node-fetch": "^2.6.2",
+    "@types/jsdom": "^16.2.15",
+    "jest": "^29.2.2",
+    "ts-jest": "^29.0.3",
+    "@types/jest": "^29.2.0"
+  }
+}
